@@ -6,8 +6,6 @@ project(json_validator)
 
 include(cmake/build.cmake)
 
-set(BUILD_SHARED_LIBS OFF)
-
 add_subdirectory(third-party)
 
 find_package(Lua 5.1 REQUIRED)

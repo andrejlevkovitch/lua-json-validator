@@ -197,10 +197,9 @@ public:
 };
 
 extern "C" {
-/**\brief has two params: schema (as string) and json (as string). In case of
- * error or validation failed return nil and error string, in case of success
- * return validated body (this can some new data, for example if set some
- * default params)
+/**\param 1 schema as string
+ * \param 2 json for validation as string
+ * \return validated json as string or nil and error string
  */
 static int lua_json_schema_validate(lua_State *state) {
   std::string schemaStr = luaL_checkstring(state, 1);
@@ -249,7 +248,36 @@ static int lua_json_schema_validate(lua_State *state) {
   return 1;
 }
 
+/**\brief validate json schema
+ * \param 1 json schema as string
+ */
+static int lua_json_schema_check(lua_State *state) {
+  std::string schemaStr = luaL_checkstring(state, 1);
+
+  json schema = json::parse(schemaStr, nullptr, false);
+  if (schema.is_discarded()) {
+    lua_pushnil(state);
+    lua_pushstring(state, "invalid json");
+    return 2;
+  }
+
+  json_validator validator;
+  validator.set_root_schema(draft7);
+
+  ValidatorErrorHandler error;
+  validator.validate(schema, error);
+  if (error) {
+    lua_pushnil(state);
+    lua_pushstring(state, error.ss.str().c_str());
+    return 2;
+  }
+
+  lua_pushboolean(state, true);
+  return 1;
+}
+
 /**\brief create new instance of validator with some schema
+ * \param 1 json schema as string
  */
 static int lua_json_validator_new(lua_State *state) {
   std::string schemaStr = luaL_checkstring(state, 1);
@@ -320,34 +348,6 @@ static int lua_json_validator_validate(lua_State *state) {
     lua_pushlstring(state, outJsonStr.c_str(), outJsonStr.size());
   }
 
-  return 1;
-}
-
-/**\brief has one param: json schema (as string). Return true in case of
- * success, or nil and error string otherwise
- */
-static int lua_json_schema_check(lua_State *state) {
-  std::string schemaStr = luaL_checkstring(state, 1);
-
-  json schema = json::parse(schemaStr, nullptr, false);
-  if (schema.is_discarded()) {
-    lua_pushnil(state);
-    lua_pushstring(state, "invalid json");
-    return 2;
-  }
-
-  json_validator validator;
-  validator.set_root_schema(draft7);
-
-  ValidatorErrorHandler error;
-  validator.validate(schema, error);
-  if (error) {
-    lua_pushnil(state);
-    lua_pushstring(state, error.ss.str().c_str());
-    return 2;
-  }
-
-  lua_pushboolean(state, true);
   return 1;
 }
 
