@@ -1,5 +1,6 @@
 // lua_json_validator.cpp
 
+#include <fstream>
 #include <lua.hpp>
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
@@ -278,9 +279,15 @@ static int lua_json_schema_check(lua_State *state) {
 
 /**\brief create new instance of validator with some schema
  * \param 1 json schema as string
+ * \param 2 directory with additional json schema files, not required
  */
 static int lua_json_validator_new(lua_State *state) {
   std::string schemaStr = luaL_checkstring(state, 1);
+  std::string schemaDir;
+
+  if (lua_gettop(state) >= 2) {
+    schemaDir = luaL_checkstring(state, 2);
+  }
 
   json schema = json::parse(schemaStr, nullptr, false);
   if (schema.is_discarded()) {
@@ -289,9 +296,27 @@ static int lua_json_validator_new(lua_State *state) {
     return 2;
   }
 
+  auto additionalSchemaLoader = [schemaDir](const nlohmann::json_uri &id,
+                                            json &                    value) {
+    std::string   filename = schemaDir + '/' + id.path();
+    std::ifstream fin{filename, std::ios::in};
+    if (fin.is_open() == false) {
+      throw std::invalid_argument{"can't open file: " + filename};
+    }
+    std::string buf;
+    std::copy(std::istreambuf_iterator<char>{fin},
+              std::istreambuf_iterator<char>{},
+              std::back_inserter(buf));
+
+    value = json::parse(buf, nullptr, false);
+    if (value.is_discarded()) {
+      throw std::invalid_argument{"invalid json in file: " + filename};
+    }
+  };
+
   // end push validator instance as table
   void *          addr      = lua_newuserdata(state, sizeof(json_validator));
-  json_validator *validator = new (addr) json_validator{};
+  json_validator *validator = new (addr) json_validator{additionalSchemaLoader};
 
   try {
     validator->set_root_schema(schema);
@@ -301,7 +326,7 @@ static int lua_json_validator_new(lua_State *state) {
     lua_pop(state, 1);
 
     lua_pushnil(state);
-    lua_pushstring(state, "invalid schema");
+    lua_pushstring(state, e.what());
     return 2;
   }
 
