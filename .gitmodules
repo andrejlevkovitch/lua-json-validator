@@ -3,4 +3,4 @@
 	url = https://github.com/nlohmann/json.git
 [submodule "third-party/json-schema-validator"]
 	path = third-party/json-schema-validator
-	url = https://github.com/pboettch/json-schema-validator.git
+	url = https://github.com/andrejlevkovitch/json-schema-validator.git
