@@ -188,13 +188,10 @@ class ValidatorErrorHandler
   void error(const nlohmann::json::json_pointer &   ptr,
              [[maybe_unused]] const nlohmann::json &instance,
              const std::string &                    message) override {
-    ss << "Error: '" << ptr << "' : " << message << std::endl;
-
-    nlohmann::json_schema::basic_error_handler::error(ptr, instance, message);
+    std::stringstream ss;
+    ss << "json schema error: '" << ptr << "' : " << message;
+    throw std::invalid_argument{ss.str()};
   }
-
-public:
-  std::stringstream ss;
 };
 
 extern "C" {
@@ -230,10 +227,12 @@ static int lua_json_schema_validate(lua_State *state) {
   }
 
   ValidatorErrorHandler error;
-  json                  patch = validator.validate(forValidation, error);
-  if (error) {
+  json                  patch;
+  try {
+    patch = validator.validate(forValidation, error);
+  } catch (std::exception &e) {
     lua_pushnil(state);
-    lua_pushstring(state, error.ss.str().c_str());
+    lua_pushstring(state, e.what());
     return 2;
   }
 
@@ -266,10 +265,11 @@ static int lua_json_schema_check(lua_State *state) {
   validator.set_root_schema(draft7);
 
   ValidatorErrorHandler error;
-  validator.validate(schema, error);
-  if (error) {
+  try {
+    validator.validate(schema, error);
+  } catch (std::exception &e) {
     lua_pushnil(state);
-    lua_pushstring(state, error.ss.str().c_str());
+    lua_pushstring(state, e.what());
     return 2;
   }
 
@@ -357,10 +357,12 @@ static int lua_json_validator_validate(lua_State *state) {
   json            forCheckJson = json::parse(forCheckStr, nullptr, false);
 
   ValidatorErrorHandler error;
-  json                  patch = validator->validate(forCheckJson, error);
-  if (error) {
+  json                  patch;
+  try {
+    patch = validator->validate(forCheckJson, error);
+  } catch (std::exception &e) {
     lua_pushnil(state);
-    lua_pushstring(state, error.ss.str().c_str());
+    lua_pushstring(state, e.what());
     return 2;
   }
 
